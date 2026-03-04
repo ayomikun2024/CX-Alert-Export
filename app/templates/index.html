@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coralogix Alerts Export</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%2358a6ff' width='32' height='32' rx='6'/></svg>" type="image/svg+xml">
+    <style>
+        :root {
+            --bg: #0f1419;
+            --surface: #1a2332;
+            --border: #2d3a4d;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --error: #f85149;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        .container { max-width: 560px; margin: 0 auto; }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+        .card h2 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0 0 1rem 0;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+        }
+        select, input[type="password"] {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        button {
+            width: 100%;
+            padding: 0.65rem 1rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        button:hover:not(:disabled) { opacity: 0.9; }
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        button.loading {
+            position: relative;
+            color: transparent;
+        }
+        button.loading::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            top: 50%;
+            left: 50%;
+            margin: -9px 0 0 -9px;
+            border: 2px solid rgba(15, 20, 25, 0.3);
+            border-top-color: var(--bg);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .btn-wrap { position: relative; }
+        .loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        #result {
+            margin-top: 1.25rem;
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        #result.success {
+            display: block;
+            background: rgba(63, 185, 80, 0.15);
+            border: 1px solid rgba(63, 185, 80, 0.4);
+            color: var(--success);
+            animation: successPop 0.4s ease-out;
+        }
+        @keyframes successPop {
+            0% { opacity: 0; transform: scale(0.96); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        #result.error {
+            display: block;
+            background: rgba(248, 81, 73, 0.15);
+            border: 1px solid rgba(248, 81, 73, 0.4);
+            color: var(--error);
+        }
+        #result.info {
+            display: block;
+            background: rgba(88, 166, 255, 0.12);
+            border: 1px solid rgba(88, 166, 255, 0.35);
+            color: var(--accent);
+        }
+        #result .count { font-weight: 600; }
+
+        /* Modal dialog */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .modal-overlay.visible {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.75rem;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+            animation: modalPop 0.3s ease-out;
+        }
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.92) translateY(-8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal.success { border-color: rgba(63, 185, 80, 0.5); }
+        .modal.info { border-color: rgba(88, 166, 255, 0.5); }
+        .modal.error { border-color: rgba(248, 81, 73, 0.5); }
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .modal.success .modal-icon { background: rgba(63, 185, 80, 0.2); }
+        .modal.info .modal-icon { background: rgba(88, 166, 255, 0.2); }
+        .modal.error .modal-icon { background: rgba(248, 81, 73, 0.2); }
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .modal.success .modal-title { color: var(--success); }
+        .modal.info .modal-title { color: var(--accent); }
+        .modal.error .modal-title { color: var(--error); }
+        .modal-message {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+        .modal-close {
+            width: 100%;
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            background: var(--border);
+            color: var(--text);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .modal-close:hover {
+            background: #3d4d66;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Coralogix Alerts Export</h1>
+        <p class="subtitle">Export all alerts from a source team and import them into a destination team.</p>
+
+        <form id="exportForm">
+            {% if auth_required %}
+            <div class="card">
+                <h2>App Access</h2>
+                <label for="app_api_key">App API Key (required)</label>
+                <input type="password" id="app_api_key" name="app_api_key" placeholder="Server API key" required autocomplete="off">
+            </div>
+            {% endif %}
+            <div class="card">
+                <h2>Export Mode</h2>
+                <label for="api_version">API Version</label>
+                <select id="api_version" name="api_version">
+                    <option value="v1/v2">Alerts API v1/v2 (legacy)</option>
+                    <option value="v3" selected>Alerts API v3</option>
+                </select>
+            </div>
+
+            <div class="card">
+                <h2>Source Team</h2>
+                <label for="source_domain">Region / Domain</label>
+                <select id="source_domain" name="source_domain" required>
+                    {% for d in domains %}
+                    <option value="{{ d.value }}">{{ d.label }}</option>
+                    {% endfor %}
+                </select>
+                <label for="source_api_key">API Key</label>
+                <input type="password" id="source_api_key" name="source_api_key" placeholder="Source team API key" required autocomplete="off">
+            </div>
+
+            <div class="card">
+                <h2>Destination Team</h2>
+                <label for="dest_domain">Region / Domain</label>
+                <select id="dest_domain" name="dest_domain" required>
+                    {% for d in domains %}
+                    <option value="{{ d.value }}">{{ d.label }}</option>
+                    {% endfor %}
+                </select>
+                <label for="dest_api_key">API Key</label>
+                <input type="password" id="dest_api_key" name="dest_api_key" placeholder="Destination team API key" required autocomplete="off">
+            </div>
+
+            <div class="btn-wrap">
+                <button type="submit" id="submitBtn">Export Alerts</button>
+            </div>
+        </form>
+
+        <div id="result" role="alert"></div>
+    </div>
+
+    <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div id="modal" class="modal">
+            <div class="modal-icon" id="modalIcon">✓</div>
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-message" id="modalMessage"></div>
+            <button type="button" class="modal-close" id="modalClose">OK</button>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('exportForm');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modal = document.getElementById('modal');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalClose = document.getElementById('modalClose');
+
+        function playSuccessSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.08);
+                osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.16);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.25);
+            } catch (_) {}
+        }
+
+        function playInfoSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency.setValueAtTime(440, ctx.currentTime);
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.2);
+            } catch (_) {}
+        }
+
+        function showModal(type, title, message) {
+            modal.className = 'modal ' + type;
+            modalIcon.textContent = type === 'error' ? '✕' : '✓';
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalOverlay.classList.add('visible');
+        }
+
+        function hideModal() {
+            modalOverlay.classList.remove('visible');
+        }
+
+        modalClose.addEventListener('click', hideModal);
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) hideModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modalOverlay.classList.contains('visible')) hideModal();
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            result.className = '';
+            result.textContent = '';
+            result.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+            submitBtn.textContent = 'Exporting…';
+
+            const body = {
+                api_version: form.api_version.value,
+                source_domain: form.source_domain.value.trim(),
+                source_api_key: form.source_api_key.value.trim(),
+                dest_domain: form.dest_domain.value.trim(),
+                dest_api_key: form.dest_api_key.value.trim(),
+            };
+
+            const headers = { 'Content-Type': 'application/json' };
+            const appKeyEl = document.getElementById('app_api_key');
+            if (appKeyEl && appKeyEl.value.trim()) {
+                headers['X-API-Key'] = appKeyEl.value.trim();
+            }
+
+            try {
+                const res = await fetch('/export', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    if (data.already_exported) {
+                        playInfoSound();
+                        showModal('info', 'Alerts already exist in the account', data.message || 'Alerts appear to have already been exported. Skipping to avoid duplicates.');
+                    } else {
+                        playSuccessSound();
+                        const msg = data.count !== undefined
+                            ? `${data.count} alert(s) exported.`
+                            : 'Alerts have been exported to the destination team.';
+                        showModal('success', 'Alert Export completed successfully', msg);
+                    }
+                } else {
+                    let msg = data.message || `Error ${res.status}`;
+                    if (data.detail) {
+                        msg = Array.isArray(data.detail)
+                            ? data.detail.map(d => d.msg || d).join('; ')
+                            : data.detail;
+                    }
+                    result.className = 'error';
+                    result.textContent = msg;
+                    result.style.display = 'block';
+                }
+            } catch (err) {
+                result.className = 'error';
+                result.textContent = err.message || 'Network error. Please try again.';
+                result.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = 'Export Alerts';
+            }
+        });
+    </script>
+</body>
+</html>
