@@ -1,6 +1,13 @@
 # Coralogix Alerts Export
 
-A web application that exports all alerts from a source Coralogix team and imports them into a destination team, using the [Alerts API v1/v2](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/alerts-api-v1-v2/#export-all-alerts-to-a-new-coralogix-team).
+A web application that exports all alerts from a source Coralogix team and imports them into a destination team.
+
+## Supported APIs
+
+- **Alert v1/v2** – Export from legacy REST APIs (`GET /api/v2/external/alerts`) and import via v3
+- **API v3** – Export and import using the Alerts API v3 (gRPC ListAlertDefs / CreateAlertDef)
+
+See the [Alerts API v1/v2 docs](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/alerts-api-v1-v2/#export-all-alerts-to-a-new-coralogix-team) and [Alerts API v3](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/) for details.
 
 ## Setup
 
@@ -34,15 +41,20 @@ uvicorn app.main:app --reload --port 8001
 
 ## Usage
 
-1. **Source Team**: Select the region/domain and enter the API key for the team you want to export alerts from.
-2. **Destination Team**: Select the region/domain and enter the API key for the team you want to import alerts into.
-3. Click **Export Alerts**.
+1. **API Version**: Choose **Alerts API v1/v2** (legacy) or **Alerts API v3**.
+2. **Source Team**: Select the region/domain and enter the API key for the team you want to export alerts from.
+3. **Destination Team**: Select the region/domain and enter the API key for the team you want to import alerts into.
+4. Click **Export Alerts**.
 
-The app will:
+**Alert v1/v2 mode:**
+1. Fetches alerts from the source via `GET /api/v2/external/alerts`
+2. Transforms the payload to v3 format (strip IDs and integration IDs)
+3. Imports into the destination via API v3 (`POST /mgmt/openapi/latest/alerts/alerts-general/v3`)
 
-1. Fetch all alerts from the source team via `GET /api/v2/external/alerts`
-2. Transform the payload (strip IDs and integration IDs so alerts can be created in the destination)
-3. Bulk import into the destination via `POST /api/v1/external/alerts/bulk`
+**API v3 mode:**
+1. Fetches alerts from the source via gRPC `ListAlertDefs`
+2. Strips IDs and integration references
+3. Imports into the destination via gRPC `CreateAlertDef`
 
 ## API Key Permissions
 
