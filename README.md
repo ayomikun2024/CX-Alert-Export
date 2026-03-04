@@ -18,7 +18,8 @@ See the [Alerts API v1/v2 docs](https://coralogix.com/docs/developer-portal/apis
 ### Installation
 
 ```bash
-cd coralogix-alerts-export
+git clone https://github.com/ayomikun2024/CX-Alert-Export.git
+cd CX-Alert-Export
 python -m venv .venv
 source .venv/bin/activate   # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
