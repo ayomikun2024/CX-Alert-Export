@@ -7,7 +7,7 @@ A web application that exports all alerts from a source Coralogix team and impor
 - **Alert v1/v2** – Export from legacy REST APIs (`GET /api/v2/external/alerts`) and import via v3
 - **API v3** – Export and import using the Alerts API v3 (gRPC ListAlertDefs / CreateAlertDef)
 
-See the [Alerts API v1/v2 docs](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/alerts-api-v1-v2/#export-all-alerts-to-a-new-coralogix-team) and [Alerts API v3](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/) for details.
+See the [Alerts API v1/v2 docs](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/alerts-api-v1-v2/#export-all-alerts-to-a-new-coralogix-team) and [Alerts API v3](https://coralogix.com/docs/developer-portal/apis/data-management/alerts-api/alerts-grpc-api/) for details.
 
 ## Setup
 
