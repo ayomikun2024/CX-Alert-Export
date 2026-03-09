@@ -253,9 +253,12 @@
                     <option value="v1/v2">Alerts API v1/v2 (legacy)</option>
                     <option value="v3" selected>Alerts API v3</option>
                 </select>
-                <label for="alert_names_prefix_filter">Name prefix filter (optional)</label>
+            </div>
+            <div class="card">
+                <h2>Filter (Optional)</h2>
+                <label for="alert_names_prefix_filter">Name prefix filter</label>
                 <input type="text" id="alert_names_prefix_filter" name="alert_names_prefix_filter"
-                       placeholder="e.g. abcd — only migrate alerts whose names start with this (case-sensitive)"
+                       placeholder="e.g. abcd — only migrate alerts whose names start with this (case-sensitive). Leave empty for all."
                        autocomplete="off">
             </div>
 
