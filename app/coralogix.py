@@ -390,29 +390,58 @@ async def fetch_dest_alert_names(domain: str, api_key: str, api_version: str) ->
             return set()
 
 
+def _get_alert_name_v3(item: dict) -> str:
+    """Extract alert name from v3 item."""
+    props = item.get("alert_def_properties") or {}
+    return (props.get("name") or "").strip()
+
+
+def _get_alert_name_v1v2(item: dict) -> str:
+    """Extract alert name from v1/v2 transformed item."""
+    props = item.get("alertDefProperties") or item.get("alert_def_properties") or {}
+    return (props.get("name") or "").strip()
+
+
+def filter_alerts_v3_by_names_and_prefix(
+    alerts_list: list[tuple[str, Any]], names: Optional[list[str]], prefix: Optional[str]
+) -> list[tuple[str, Any]]:
+    """Filter v3 alerts by names and/or prefix. Include if (name in names) OR (name starts with prefix)."""
+    if not names and not prefix:
+        return alerts_list
+    names_set = {n.strip() for n in names} if names else set()
+    return [
+        (sid, item) for sid, item in alerts_list
+        if (names_set and _get_alert_name_v3(item) in names_set) or (prefix and _get_alert_name_v3(item).startswith(prefix))
+    ]
+
+
+def filter_alerts_v1v2_by_names_and_prefix(
+    alerts_v3: list[dict[str, Any]], names: Optional[list[str]], prefix: Optional[str]
+) -> list[dict[str, Any]]:
+    """Filter v1/v2 alerts by names and/or prefix. Include if (name in names) OR (name starts with prefix)."""
+    if not names and not prefix:
+        return alerts_v3
+    names_set = {n.strip() for n in names} if names else set()
+    return [
+        a for a in alerts_v3
+        if (names_set and _get_alert_name_v1v2(a) in names_set) or (prefix and _get_alert_name_v1v2(a).startswith(prefix))
+    ]
+
+
 def filter_alerts_by_name_prefix(
     alerts_list: list[tuple[str, Any]], prefix: str
 ) -> list[tuple[str, Any]]:
     """Filter v3 alerts to those whose name starts with prefix (case-sensitive)."""
     if not prefix:
         return alerts_list
-    result = []
-    for source_id, item in alerts_list:
-        props = item.get("alert_def_properties") or {}
-        name = (props.get("name") or "").strip()
-        if name.startswith(prefix):
-            result.append((source_id, item))
-    return result
+    return [(sid, item) for sid, item in alerts_list if _get_alert_name_v3(item).startswith(prefix)]
 
 
 def filter_alerts_v1v2_by_prefix(alerts_v3: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:
     """Filter v1/v2 transformed alerts by name prefix (case-sensitive)."""
     if not prefix:
         return alerts_v3
-    return [
-        a for a in alerts_v3
-        if ((a.get("alertDefProperties") or a.get("alert_def_properties") or {}).get("name") or "").strip().startswith(prefix)
-    ]
+    return [a for a in alerts_v3 if _get_alert_name_v1v2(a).startswith(prefix)]
 
 
 def extract_source_names_for_check(api_version: str, response: dict, prepared: Optional[dict] = None) -> set[str]:

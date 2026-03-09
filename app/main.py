@@ -23,8 +23,8 @@ from app.coralogix import (
     prepare_v3_for_import,
     fetch_dest_alert_names,
     extract_source_names_for_check,
-    filter_alerts_by_name_prefix,
-    filter_alerts_v1v2_by_prefix,
+    filter_alerts_v3_by_names_and_prefix,
+    filter_alerts_v1v2_by_names_and_prefix,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -55,13 +55,23 @@ async def verify_api_key(x_api_key: Optional[str] = Header(None, alias="X-API-Ke
         raise HTTPException(401, "Invalid or missing API key")
 
 
+def _parse_alert_names_filter(value: Optional[str]) -> Optional[list[str]]:
+    """Parse comma-separated alert names, return None if empty."""
+    if not value or not str(value).strip():
+        return None
+    names = [n.strip() for n in str(value).split(",") if n.strip()]
+    return names if names else None
+
+
 class ExportRequest(BaseModel):
     api_version: str = Field(default="v1/v2", description="API version: v1/v2 or v3")
     source_domain: str = Field(..., min_length=1, max_length=32, description="Source team domain (e.g. us1, eu1)")
     source_api_key: str = Field(..., min_length=1, max_length=512, description="Source team API key")
     dest_domain: str = Field(..., min_length=1, max_length=32, description="Destination team domain")
     dest_api_key: str = Field(..., min_length=1, max_length=512, description="Destination team API key")
-    alert_names_prefix_filter: Optional[str] = Field(default=None, description="Only migrate alerts whose names start with this prefix (case-sensitive)")
+    alert_export_mode: Optional[str] = Field(default="all", description="'all' or 'by_name'")
+    alert_names_filter: Optional[str] = Field(default=None, description="Comma-separated alert names (when mode is by_name)")
+    alert_names_prefix_filter: Optional[str] = Field(default=None, description="Alert name prefix (when mode is by_name, case-sensitive)")
 
 
 def _domain_choices() -> list[dict[str, str]]:
@@ -113,14 +123,17 @@ async def export_alerts(
         alerts_list = prepared.get("alerts") or []
         skipped = prepared.get("skipped_flow") or 0
 
-        prefix = (body.alert_names_prefix_filter or "").strip()
-        if prefix:
-            alerts_list = filter_alerts_by_name_prefix(alerts_list, prefix)
-            prepared = {"alerts": alerts_list, "skipped_flow": skipped}
+        if (body.alert_export_mode or "all") == "by_name":
+            names = _parse_alert_names_filter(body.alert_names_filter)
+            prefix = (body.alert_names_prefix_filter or "").strip() or None
+            if names or prefix:
+                alerts_list = filter_alerts_v3_by_names_and_prefix(alerts_list, names, prefix)
+                prepared = {"alerts": alerts_list, "skipped_flow": skipped}
 
         alerts_v3_count = len(alerts_list)
         if alerts_v3_count == 0:
-            msg = f"No alerts matched the prefix '{prefix}'." if prefix else "No alerts to export. Source team has no alerts."
+            mode = body.alert_export_mode or "all"
+            msg = "No alerts matched the filter (alert names or prefix)." if mode == "by_name" else "No alerts to export. Source team has no alerts."
             return {
                 "success": True,
                 "message": msg,
@@ -169,12 +182,15 @@ async def export_alerts(
         except Exception:
             raise
         skipped = count - len(alerts_v3)  # unsupported types
-        prefix = (body.alert_names_prefix_filter or "").strip()
-        if prefix:
-            alerts_v3 = filter_alerts_v1v2_by_prefix(alerts_v3, prefix)
+        if (body.alert_export_mode or "all") == "by_name":
+            names = _parse_alert_names_filter(body.alert_names_filter)
+            prefix = (body.alert_names_prefix_filter or "").strip() or None
+            if names or prefix:
+                alerts_v3 = filter_alerts_v1v2_by_names_and_prefix(alerts_v3, names, prefix)
 
         if not alerts_v3:
-            msg = f"No alerts matched the prefix '{prefix}'." if prefix else f"No alerts could be converted to v3 format. {count} alert(s) skipped (unsupported types)."
+            mode = body.alert_export_mode or "all"
+            msg = "No alerts matched the filter (alert names or prefix)." if mode == "by_name" else f"No alerts could be converted to v3 format. {count} alert(s) skipped (unsupported types)."
             return {
                 "success": True,
                 "message": msg,

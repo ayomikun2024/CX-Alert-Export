@@ -253,12 +253,21 @@
                     <option value="v1/v2">Alerts API v1/v2 (legacy)</option>
                     <option value="v3" selected>Alerts API v3</option>
                 </select>
+                <label for="alert_export_mode">Export mode</label>
+                <select id="alert_export_mode" name="alert_export_mode">
+                    <option value="all" selected>Export all</option>
+                    <option value="by_name">Move by alert name</option>
+                </select>
             </div>
-            <div class="card">
-                <h2>Filter (Optional)</h2>
-                <label for="alert_names_prefix_filter">Name prefix filter</label>
+            <div id="alertFilterCard" class="card" style="display: none;">
+                <h2>Filter (Move by alert name)</h2>
+                <label for="alert_names_filter">Alert names</label>
+                <input type="text" id="alert_names_filter" name="alert_names_filter"
+                       placeholder="e.g. Alert A, Alert B (comma-separated, exact match)"
+                       autocomplete="off">
+                <label for="alert_names_prefix_filter">Name prefix filter (optional addition)</label>
                 <input type="text" id="alert_names_prefix_filter" name="alert_names_prefix_filter"
-                       placeholder="e.g. abcd — only migrate alerts whose names start with this (case-sensitive). Leave empty for all."
+                       placeholder="e.g. abcd — or migrate alerts whose names start with this (case-sensitive)"
                        autocomplete="off">
             </div>
 
@@ -366,6 +375,18 @@
             if (e.key === 'Escape' && modalOverlay.classList.contains('visible')) hideModal();
         });
 
+        const alertExportModeEl = document.getElementById('alert_export_mode');
+        const alertFilterCard = document.getElementById('alertFilterCard');
+        function updateAlertFilterVisibility() {
+            if (alertExportModeEl?.value === 'by_name') {
+                alertFilterCard.style.display = 'block';
+            } else {
+                alertFilterCard.style.display = 'none';
+            }
+        }
+        alertExportModeEl?.addEventListener('change', updateAlertFilterVisibility);
+        updateAlertFilterVisibility();
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             result.className = '';
@@ -382,8 +403,20 @@
                 dest_domain: form.dest_domain.value.trim(),
                 dest_api_key: form.dest_api_key.value.trim(),
             };
+            body.alert_export_mode = alertExportModeEl?.value || 'all';
+            const namesEl = document.getElementById('alert_names_filter');
             const prefixEl = document.getElementById('alert_names_prefix_filter');
+            body.alert_names_filter = namesEl?.value?.trim() || null;
             body.alert_names_prefix_filter = prefixEl?.value?.trim() || null;
+            if (body.alert_export_mode === 'by_name' && !body.alert_names_filter && !body.alert_names_prefix_filter) {
+                result.className = 'error';
+                result.textContent = 'When using "Move by alert name", specify at least one of: Alert names or Name prefix filter.';
+                result.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                submitBtn.textContent = 'Export Alerts';
+                return;
+            }
 
             const headers = { 'Content-Type': 'application/json' };
             const appKeyEl = document.getElementById('app_api_key');
