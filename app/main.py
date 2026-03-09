@@ -23,6 +23,8 @@ from app.coralogix import (
     prepare_v3_for_import,
     fetch_dest_alert_names,
     extract_source_names_for_check,
+    filter_alerts_by_name_prefix,
+    filter_alerts_v1v2_by_prefix,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -59,6 +61,7 @@ class ExportRequest(BaseModel):
     source_api_key: str = Field(..., min_length=1, max_length=512, description="Source team API key")
     dest_domain: str = Field(..., min_length=1, max_length=32, description="Destination team domain")
     dest_api_key: str = Field(..., min_length=1, max_length=512, description="Destination team API key")
+    alert_names_prefix_filter: Optional[str] = Field(default=None, description="Only migrate alerts whose names start with this prefix (case-sensitive)")
 
 
 def _domain_choices() -> list[dict[str, str]]:
@@ -108,13 +111,19 @@ async def export_alerts(
 
         prepared = prepare_v3_for_import(response)
         alerts_list = prepared.get("alerts") or []
-        alerts_v3_count = len(alerts_list)
         skipped = prepared.get("skipped_flow") or 0
 
+        prefix = (body.alert_names_prefix_filter or "").strip()
+        if prefix:
+            alerts_list = filter_alerts_by_name_prefix(alerts_list, prefix)
+            prepared = {"alerts": alerts_list, "skipped_flow": skipped}
+
+        alerts_v3_count = len(alerts_list)
         if alerts_v3_count == 0:
+            msg = f"No alerts matched the prefix '{prefix}'." if prefix else "No alerts to export. Source team has no alerts."
             return {
                 "success": True,
-                "message": "No alerts to export. Source team has no alerts.",
+                "message": msg,
                 "count": 0,
             }
     else:
@@ -159,12 +168,16 @@ async def export_alerts(
             alerts_v3 = transform_payload_for_import(response)
         except Exception:
             raise
-        skipped = count - len(alerts_v3)
+        skipped = count - len(alerts_v3)  # unsupported types
+        prefix = (body.alert_names_prefix_filter or "").strip()
+        if prefix:
+            alerts_v3 = filter_alerts_v1v2_by_prefix(alerts_v3, prefix)
 
         if not alerts_v3:
+            msg = f"No alerts matched the prefix '{prefix}'." if prefix else f"No alerts could be converted to v3 format. {count} alert(s) skipped (unsupported types)."
             return {
                 "success": True,
-                "message": f"No alerts could be converted to v3 format. {count} alert(s) skipped (unsupported types).",
+                "message": msg,
                 "count": 0,
             }
 

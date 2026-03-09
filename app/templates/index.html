@@ -57,7 +57,7 @@
             font-weight: 500;
             margin-bottom: 0.35rem;
         }
-        select, input[type="password"] {
+        select, input[type="password"], input[type="text"] {
             width: 100%;
             padding: 0.5rem 0.75rem;
             font-size: 0.9rem;
@@ -70,6 +70,9 @@
         select:focus, input:focus {
             outline: none;
             border-color: var(--accent);
+        }
+        input[type="text"]::placeholder {
+            color: var(--text-muted);
         }
         button {
             width: 100%;
@@ -250,6 +253,10 @@
                     <option value="v1/v2">Alerts API v1/v2 (legacy)</option>
                     <option value="v3" selected>Alerts API v3</option>
                 </select>
+                <label for="alert_names_prefix_filter">Name prefix filter (optional)</label>
+                <input type="text" id="alert_names_prefix_filter" name="alert_names_prefix_filter"
+                       placeholder="e.g. abcd — only migrate alerts whose names start with this (case-sensitive)"
+                       autocomplete="off">
             </div>
 
             <div class="card">
@@ -372,6 +379,8 @@
                 dest_domain: form.dest_domain.value.trim(),
                 dest_api_key: form.dest_api_key.value.trim(),
             };
+            const prefixEl = document.getElementById('alert_names_prefix_filter');
+            body.alert_names_prefix_filter = prefixEl?.value?.trim() || null;
 
             const headers = { 'Content-Type': 'application/json' };
             const appKeyEl = document.getElementById('app_api_key');

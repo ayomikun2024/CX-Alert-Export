@@ -390,6 +390,31 @@ async def fetch_dest_alert_names(domain: str, api_key: str, api_version: str) ->
             return set()
 
 
+def filter_alerts_by_name_prefix(
+    alerts_list: list[tuple[str, Any]], prefix: str
+) -> list[tuple[str, Any]]:
+    """Filter v3 alerts to those whose name starts with prefix (case-sensitive)."""
+    if not prefix:
+        return alerts_list
+    result = []
+    for source_id, item in alerts_list:
+        props = item.get("alert_def_properties") or {}
+        name = (props.get("name") or "").strip()
+        if name.startswith(prefix):
+            result.append((source_id, item))
+    return result
+
+
+def filter_alerts_v1v2_by_prefix(alerts_v3: list[dict[str, Any]], prefix: str) -> list[dict[str, Any]]:
+    """Filter v1/v2 transformed alerts by name prefix (case-sensitive)."""
+    if not prefix:
+        return alerts_v3
+    return [
+        a for a in alerts_v3
+        if ((a.get("alertDefProperties") or a.get("alert_def_properties") or {}).get("name") or "").strip().startswith(prefix)
+    ]
+
+
 def extract_source_names_for_check(api_version: str, response: dict, prepared: Optional[dict] = None) -> set[str]:
     """Extract source alert names for duplicate check."""
     if api_version == "v3" and prepared:
